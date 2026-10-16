@@ -68,5 +68,19 @@ resource "azurerm_synapse_role_assignment" "admins" {
   depends_on = [azurerm_synapse_firewall_rule.allowed]
 }
 
+# Deploy-identiteten kör Synapse-SQL:en i CI. Den blir Synapse Administrator automatiskt när den
+# skapar workspacet, men den tilldelningen får principal-typen User, och då nekas inloggningen
+# till serverless SQL. Därför en explicit tilldelning som ServicePrincipal.
+data "azurerm_client_config" "current" {}
+
+resource "azurerm_synapse_role_assignment" "deployer_sql_admin" {
+  synapse_workspace_id = azurerm_synapse_workspace.this.id
+  role_name            = "Synapse SQL Administrator"
+  principal_id         = data.azurerm_client_config.current.object_id
+  principal_type       = "ServicePrincipal"
+
+  depends_on = [azurerm_synapse_firewall_rule.allowed]
+}
+
 # Power BI-workspacet kopplas som linked service manuellt i Synapse Studio
 # (Manage → Linked services → Connect to Power BI), eftersom azurerm saknar stöd för det.
