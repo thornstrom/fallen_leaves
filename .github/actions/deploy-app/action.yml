@@ -52,6 +52,31 @@ runs:
           | sudo tar -xj -C /usr/local/bin sqlcmd
         sqlcmd --version
 
+    # TILLFÄLLIG felsökning av Synapse-inloggningen. Ta bort när den fungerar stabilt.
+    - name: Diagnos Synapse-inloggning (tillfällig)
+      shell: bash
+      run: |
+        tok="$(az account get-access-token --resource https://database.windows.net/ --query accessToken -o tsv)"
+        echo "::add-mask::$tok"
+        TOKEN="$tok" python3 - <<'PY'
+        import base64, json, os
+        p = os.environ["TOKEN"].split(".")[1]
+        c = json.loads(base64.urlsafe_b64decode(p + "=" * (-len(p) % 4)))
+        cid = os.environ.get("ARM_CLIENT_ID", "")
+        print("aud:", c.get("aud"), "| idtyp:", c.get("idtyp"), "| tid:", c.get("tid"))
+        print("oid (8 första):", str(c.get("oid"))[:8], "| appid == ARM_CLIENT_ID:", c.get("appid") == cid)
+        PY
+        for i in $(seq 1 10); do
+          if out="$(sqlcmd -S "$SYNAPSE_ENDPOINT" -d master --authentication-method ActiveDirectoryAzCli -b -h -1 \
+                -Q "SET NOCOUNT ON; SELECT SUSER_SNAME(), CONVERT(varchar(100), SUSER_SID(), 1)" 2>&1)"; then
+            echo "Försök $i: inloggning OK: $out"
+            exit 0
+          fi
+          echo "Försök $i: $out"
+          sleep 30
+        done
+        echo "::warning::Diagnos: ingen lyckad inloggning på 10 försök."
+
     - name: Synapse SQL
       shell: bash
       run: synapse/deploy.sh "$SYNAPSE_ENDPOINT" "$BUNDLE_VAR_gold_root"

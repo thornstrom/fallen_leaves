@@ -19,7 +19,7 @@ master_key_password="$(openssl rand -base64 32 | tr -d '/+=')Aa1!"
 run() {
   local db="$1" file="$2"
   echo "==> $file ($db)"
-  sqlcmd -S "$endpoint" -d "$db" --authentication-method ActiveDirectoryDefault -b \
+  sqlcmd -S "$endpoint" -d "$db" --authentication-method ActiveDirectoryAzCli -b \
     -v gold_root="$gold_root" master_key_password="$master_key_password" \
     -i "$file"
 }
