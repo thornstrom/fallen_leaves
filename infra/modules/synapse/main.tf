@@ -20,6 +20,12 @@ resource "azurerm_synapse_workspace" "this" {
   identity {
     type = "SystemAssigned"
   }
+
+  # Azure sätter ett standardvärde ("sqladminuser") även när bara Entra ID-inloggning
+  # används. Utan ignore_changes ersätter Terraform hela workspacet vid varje apply.
+  lifecycle {
+    ignore_changes = [sql_administrator_login]
+  }
 }
 
 # Krävs för att Azure-tjänster (t.ex. Power BI-tjänsten) ska nå endpointen.
