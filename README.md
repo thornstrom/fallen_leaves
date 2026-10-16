@@ -75,8 +75,11 @@ terraform init && terraform apply
 Bootstrap använder **lokal state**. Spara `bootstrap/terraform.tfstate` på ett säkert ställe, eftersom git ignorerar den.
 
 ### 2. Fyll i miljövariablerna
-I `infra/envs/{dev,prod}/terraform.tfvars` anger du `admin_object_ids` (ditt Entra ID object ID, `az ad signed-in-user show --query id -o tsv`)
-och `catalog_admins` (din e-post i Databricks).
+I `infra/envs/{dev,prod}/terraform.tfvars` anger du `admin_object_ids` (ditt Entra ID object ID, `az ad signed-in-user show --query id -o tsv`).
+Din e-post i Databricks läggs som secret, så att den inte syns i det publika repot eller i loggarna:
+```bash
+gh secret set CATALOG_ADMIN_EMAIL --body "du@example.com"
+```
 
 ### 3. Första deployen och Unity Catalog-behörigheter
 Öppna en PR mot `main`. Workflowet `pr` skapar då dev-miljön. Första gången stoppar Terraform troligen
