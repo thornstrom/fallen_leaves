@@ -43,8 +43,18 @@ provider "github" {
 data "azurerm_client_config" "current" {}
 data "azurerm_subscription" "current" {}
 
+# GitHub skickar OIDC-subject med ägarens och repots numeriska id
+# ("repo:<ägare>@<id>/<repo>@<id>:..."), så att ett nytt repo med samma namn inte matchar.
+data "github_user" "owner" {
+  username = var.github_owner
+}
+
+data "github_repository" "this" {
+  name = var.github_repo
+}
+
 locals {
-  repo_full_name = "${var.github_owner}/${var.github_repo}"
+  oidc_subject_prefix = "repo:${var.github_owner}@${data.github_user.owner.id}/${var.github_repo}@${data.github_repository.this.repo_id}"
 
   # Miljöer i Azure (en state-container och en deploy-identitet per miljö).
   environments = toset(["dev", "prod"])
@@ -126,7 +136,7 @@ resource "azuread_application_federated_identity_credential" "github" {
   display_name   = "github-${var.github_repo}-${each.key}"
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
-  subject        = "repo:${local.repo_full_name}:environment:${each.key}"
+  subject        = "${local.oidc_subject_prefix}:environment:${each.key}"
 }
 
 # Contributor för att skapa resurser och RBAC Administrator för att skapa rolltilldelningar
