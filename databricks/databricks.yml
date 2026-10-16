@@ -1,0 +1,47 @@
+# Databricks Asset Bundle för ETL-jobben.
+# Workspace-host sätts med DATABRICKS_HOST (från terraform output) och gold_root med
+# BUNDLE_VAR_gold_root, både lokalt och i GitHub Actions.
+
+bundle:
+  name: fallen_leaves
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Unity Catalog-catalog för miljön
+  gold_root:
+    description: abfss-sökväg där gold-tabellerna skrivs (terraform output gold_root)
+  spark_version:
+    default: 15.4.x-scala2.12
+  node_type:
+    default: Standard_D4ds_v5
+  secret_scope:
+    default: fallen-leaves
+
+artifacts:
+  fallen_leaves:
+    type: whl
+    path: .
+    build: python3 -m pip wheel . --no-deps -w dist
+
+targets:
+  dev:
+    default: true
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    presets:
+      name_prefix: "[dev] "
+      # Schemat är pausat i dev; kör jobbet manuellt vid behov.
+      trigger_pause_status: PAUSED
+    variables:
+      catalog: fallen_leaves_dev
+
+  prod:
+    workspace:
+      root_path: /Workspace/Shared/.bundle/${bundle.name}/${bundle.target}
+    presets:
+      trigger_pause_status: UNPAUSED
+    variables:
+      catalog: fallen_leaves_prod

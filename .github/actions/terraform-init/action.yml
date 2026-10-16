@@ -1,0 +1,28 @@
+name: terraform-init
+description: Installerar Terraform och initierar en miljö mot state i Azure.
+
+inputs:
+  environment:
+    description: dev eller prod
+    required: true
+  resource-group:
+    required: true
+  storage-account:
+    required: true
+  container:
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: 1.9.8
+        terraform_wrapper: false
+    - shell: bash
+      working-directory: infra/envs/${{ inputs.environment }}
+      run: |
+        terraform init -input=false \
+          -backend-config="resource_group_name=${{ inputs.resource-group }}" \
+          -backend-config="storage_account_name=${{ inputs.storage-account }}" \
+          -backend-config="container_name=${{ inputs.container }}"

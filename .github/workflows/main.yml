@@ -1,0 +1,97 @@
+name: main
+
+# Merge till main: tester, terraform plan för prod, och efter manuellt godkännande
+# (GitHub-environment "prod") apply och deploy av jobb och SQL.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_IN_AUTOMATION: "true"
+  DATABRICKS_AUTH_TYPE: azure-cli
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+jobs:
+  checks:
+    uses: ./.github/workflows/_checks.yml
+
+  plan-prod:
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: prod-plan
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: ./.github/actions/terraform-init
+        with:
+          environment: prod
+          resource-group: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          storage-account: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          container: ${{ vars.TFSTATE_CONTAINER }}
+
+      - name: terraform plan
+        working-directory: infra/envs/prod
+        run: |
+          terraform plan -input=false -no-color -out=tfplan | tee plan.txt
+          { echo '### Terraform plan (prod)'; echo 'Granska innan du godkänner deploy-prod.'; echo '```'; tail -c 60000 plan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-prod
+          path: infra/envs/prod/tfplan
+          retention-days: 1
+
+  deploy-prod:
+    needs: plan-prod
+    runs-on: ubuntu-latest
+    environment: prod
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: tfplan-prod
+          path: infra/envs/prod
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: ./.github/actions/terraform-init
+        with:
+          environment: prod
+          resource-group: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          storage-account: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          container: ${{ vars.TFSTATE_CONTAINER }}
+
+      - name: terraform apply (granskad plan)
+        working-directory: infra/envs/prod
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - uses: ./.github/actions/deploy-app
+        with:
+          environment: prod

@@ -1,0 +1,57 @@
+name: deploy-app
+description: Deployar Databricks-bundlen och Synapse-SQL med värden från terraform output.
+
+inputs:
+  environment:
+    description: dev eller prod
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Läs terraform outputs
+      shell: bash
+      working-directory: infra/envs/${{ inputs.environment }}
+      run: |
+        {
+          echo "DATABRICKS_HOST=$(terraform output -raw databricks_host)"
+          echo "BUNDLE_VAR_gold_root=$(terraform output -raw gold_root)"
+          echo "SYNAPSE_ENDPOINT=$(terraform output -raw synapse_serverless_endpoint)"
+          echo "KEY_VAULT_NAME=$(terraform output -raw key_vault_name)"
+        } >> "$GITHUB_ENV"
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+
+    - uses: databricks/setup-cli@v0.230.0
+
+    # Key Vault är källan för hemligheter; de kopieras till Databricks secret scope vid varje deploy.
+    - name: Synka Trafikverket-nyckel till Databricks
+      shell: bash
+      run: |
+        key="$(az keyvault secret show --vault-name "$KEY_VAULT_NAME" --name trafikverket-api-key --query value -o tsv 2>/dev/null || true)"
+        if [ -z "$key" ]; then
+          echo "::warning::Hemligheten trafikverket-api-key saknas i $KEY_VAULT_NAME – ingest-trafikverket kommer att fallera tills den är satt."
+          exit 0
+        fi
+        echo "::add-mask::$key"
+        databricks secrets put-secret fallen-leaves trafikverket-api-key --string-value "$key"
+
+    - name: Databricks bundle deploy
+      shell: bash
+      working-directory: databricks
+      run: |
+        databricks bundle validate -t ${{ inputs.environment }}
+        databricks bundle deploy -t ${{ inputs.environment }}
+
+    - name: Installera go-sqlcmd
+      shell: bash
+      run: |
+        curl -fsSL https://github.com/microsoft/go-sqlcmd/releases/download/v1.6.0/sqlcmd-v1.6.0-linux-amd64.tar.bz2 \
+          | sudo tar -xj -C /usr/local/bin sqlcmd
+        sqlcmd --version
+
+    - name: Synapse SQL
+      shell: bash
+      run: synapse/deploy.sh "$SYNAPSE_ENDPOINT" "$BUNDLE_VAR_gold_root"

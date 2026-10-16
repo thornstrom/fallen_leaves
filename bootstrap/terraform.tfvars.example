@@ -1,0 +1,5 @@
+# Kopiera till terraform.tfvars (ignoreras av git) och fyll i.
+subscription_id = "00000000-0000-0000-0000-000000000000"
+github_owner    = "din-github-anvandare"
+github_repo     = "fallen_leaves"
+prod_reviewers  = ["din-github-anvandare"]

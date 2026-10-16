@@ -1,0 +1,62 @@
+name: pr
+
+# Pull request mot main: tester, sedan deploy till dev.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  ARM_USE_OIDC: "true"
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  TF_IN_AUTOMATION: "true"
+  DATABRICKS_AUTH_TYPE: azure-cli
+
+jobs:
+  checks:
+    uses: ./.github/workflows/_checks.yml
+
+  deploy-dev:
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: dev
+    # Bara en deploy åt gången till dev, även om flera PR:er är öppna.
+    concurrency:
+      group: deploy-dev
+      cancel-in-progress: false
+    env:
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: ./.github/actions/terraform-init
+        with:
+          environment: dev
+          resource-group: ${{ vars.TFSTATE_RESOURCE_GROUP }}
+          storage-account: ${{ vars.TFSTATE_STORAGE_ACCOUNT }}
+          container: ${{ vars.TFSTATE_CONTAINER }}
+
+      - name: terraform plan
+        working-directory: infra/envs/dev
+        run: |
+          terraform plan -input=false -no-color -out=tfplan | tee plan.txt
+          { echo '### Terraform plan (dev)'; echo '```'; tail -c 60000 plan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: terraform apply
+        working-directory: infra/envs/dev
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - uses: ./.github/actions/deploy-app
+        with:
+          environment: dev

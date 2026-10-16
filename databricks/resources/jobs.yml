@@ -1,0 +1,102 @@
+resources:
+  jobs:
+    fallen_leaves_daily:
+      name: fallen_leaves_daily
+      description: Hämtar gårdagens tåglägen och väder, och bygger bronze → silver → gold.
+      max_concurrent_runs: 1
+      schedule:
+        quartz_cron_expression: "0 0 4 * * ?"
+        timezone_id: Europe/Stockholm
+      job_clusters:
+        - job_cluster_key: etl
+          new_cluster: &cluster
+            spark_version: ${var.spark_version}
+            node_type_id: ${var.node_type}
+            num_workers: 0
+            data_security_mode: SINGLE_USER
+            spark_conf:
+              spark.databricks.cluster.profile: singleNode
+              spark.master: "local[*, 4]"
+            custom_tags:
+              ResourceClass: SingleNode
+              project: fallen_leaves
+            spark_env_vars:
+              TRAFIKVERKET_API_KEY: "{{secrets/${var.secret_scope}/trafikverket-api-key}}"
+      tasks:
+        - task_key: ingest_trafikverket
+          job_cluster_key: etl
+          libraries: &wheel
+            - whl: ../dist/*.whl
+          python_wheel_task:
+            package_name: fallen_leaves
+            entry_point: fallen-leaves
+            parameters: ["--catalog", "${var.catalog}", "ingest-trafikverket", "--lookback-days", "2"]
+
+        - task_key: ingest_smhi
+          job_cluster_key: etl
+          libraries: *wheel
+          python_wheel_task:
+            package_name: fallen_leaves
+            entry_point: fallen-leaves
+            parameters: ["--catalog", "${var.catalog}", "ingest-smhi", "--since-days", "3"]
+
+        - task_key: bronze
+          depends_on: [{ task_key: ingest_trafikverket }, { task_key: ingest_smhi }]
+          job_cluster_key: etl
+          libraries: *wheel
+          python_wheel_task:
+            package_name: fallen_leaves
+            entry_point: fallen-leaves
+            parameters: ["--catalog", "${var.catalog}", "bronze"]
+
+        - task_key: silver
+          depends_on: [{ task_key: bronze }]
+          job_cluster_key: etl
+          libraries: *wheel
+          python_wheel_task:
+            package_name: fallen_leaves
+            entry_point: fallen-leaves
+            parameters: ["--catalog", "${var.catalog}", "silver"]
+
+        - task_key: gold
+          depends_on: [{ task_key: silver }]
+          job_cluster_key: etl
+          libraries: *wheel
+          python_wheel_task:
+            package_name: fallen_leaves
+            entry_point: fallen-leaves
+            parameters: ["--catalog", "${var.catalog}", "gold", "--gold-root", "${var.gold_root}"]
+
+    fallen_leaves_rebuild:
+      name: fallen_leaves_rebuild
+      description: Bygger om silver från hela bronze och därefter gold (t.ex. efter logikändringar). Körs manuellt.
+      max_concurrent_runs: 1
+      job_clusters:
+        - job_cluster_key: etl
+          new_cluster: *cluster
+      tasks:
+        - task_key: bronze
+          job_cluster_key: etl
+          libraries: *wheel
+          python_wheel_task:
+            package_name: fallen_leaves
+            entry_point: fallen-leaves
+            parameters: ["--catalog", "${var.catalog}", "bronze"]
+
+        - task_key: silver_full
+          depends_on: [{ task_key: bronze }]
+          job_cluster_key: etl
+          libraries: *wheel
+          python_wheel_task:
+            package_name: fallen_leaves
+            entry_point: fallen-leaves
+            parameters: ["--catalog", "${var.catalog}", "silver", "--full"]
+
+        - task_key: gold
+          depends_on: [{ task_key: silver_full }]
+          job_cluster_key: etl
+          libraries: *wheel
+          python_wheel_task:
+            package_name: fallen_leaves
+            entry_point: fallen-leaves
+            parameters: ["--catalog", "${var.catalog}", "gold", "--gold-root", "${var.gold_root}"]
