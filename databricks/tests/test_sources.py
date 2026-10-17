@@ -50,6 +50,14 @@ def test_announcement_query_filters_operator_and_date():
     assert '<LT name="ScheduledDepartureDateTime" value="2026-10-16T00:00:00" />' in xml
 
 
+def test_station_query_uses_rail_infrastructure_namespace():
+    # Utan namespace svarar API:t "ObjectType 'TrainStation' does not exists".
+    xml = trafikverket.station_query("KEY", limit=100, skip=0)
+
+    assert 'objecttype="TrainStation"' in xml
+    assert 'namespace="rail.infrastructure"' in xml
+
+
 def test_query_escapes_values():
     xml = trafikverket.announcement_query('K"<', date(2026, 10, 15), ["A&B"], limit=1, skip=0)
 
