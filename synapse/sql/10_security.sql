@@ -22,7 +22,7 @@ GO
 -- Läsroll för rapportanvändare. Lägg till användare med:
 --   CREATE USER [namn@domän] FROM EXTERNAL PROVIDER;
 --   ALTER ROLE gold_reader ADD MEMBER [namn@domän];
-IF DATABASE_PRINCIPAL_ID('gold_reader') IS NULL
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'gold_reader' AND type = 'R')
     CREATE ROLE gold_reader;
 GO
 

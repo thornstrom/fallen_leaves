@@ -24,7 +24,7 @@ runs:
       with:
         python-version: "3.11"
 
-    - uses: databricks/setup-cli@v0.230.0
+    - uses: databricks/setup-cli@v1.21.0
 
     # Key Vault är källan för hemligheter; de kopieras till Databricks secret scope vid varje deploy.
     - name: Synka Trafikverket-nyckel till Databricks

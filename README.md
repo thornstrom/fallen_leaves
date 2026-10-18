@@ -75,19 +75,39 @@ terraform init && terraform apply
 Bootstrap använder **lokal state**. Spara `bootstrap/terraform.tfstate` på ett säkert ställe, eftersom git ignorerar den.
 
 ### 2. Fyll i miljövariablerna
-I `infra/envs/{dev,prod}/terraform.tfvars` anger du `admin_object_ids` (ditt Entra ID object ID, `az ad signed-in-user show --query id -o tsv`)
-och `catalog_admins` (din e-post i Databricks).
+I `infra/envs/{dev,prod}/terraform.tfvars` anger du `admin_object_ids` (ditt Entra ID object ID, `az ad signed-in-user show --query id -o tsv`).
+Din e-post i Databricks läggs som secret, så att den inte syns i det publika repot eller i loggarna:
+```bash
+gh secret set CATALOG_ADMIN_EMAIL --body "du@example.com"
+```
 
-### 3. Första deployen och Unity Catalog-behörigheter
-Öppna en PR mot `main`. Workflowet `pr` skapar då dev-miljön. Första gången stoppar Terraform troligen
-vid Unity Catalog-objekten (storage credential, external location och catalog), eftersom deploy-identiteten
-ännu saknar behörighet på metastoren. Som Databricks account admin kör du då, i dev-workspacet:
+### 3. Första deployen (en gång per miljö)
+Öppna en PR mot `main`. Workflowet `pr` skapar då dev-miljön. Första gången krävs några manuella steg
+innan deployen går igenom. Kör om det misslyckade jobbet efter varje steg (`gh run rerun <run-id> --failed`).
+
+**a. Logga in i Databricks-workspacet.** Terraform ger dig rättigheter på catalogen, men din användare
+finns inte i Databricks förrän du har loggat in en gång. Annars stoppar apply med
+`Could not find principal`. Workspace-adressen får du med `terraform -chdir=infra/envs/dev output -raw databricks_host`.
+
+**b. Skapa en SQL-login för deploy-identiteten i Synapse.** Synapse registrerar identiteten som skapar
+workspacet med dess object ID, men en app loggar in med sitt client ID, så CI nekas
+(`Login failed for user '<token-identified principal>'`). Som Synapse-admin kör du, mot `master` på
+serverless-endpointen (`terraform -chdir=infra/envs/dev output -raw synapse_serverless_endpoint`):
+```bash
+sqlcmd -S <serverless-endpoint> -d master --authentication-method ActiveDirectoryAzCli -b \
+  -Q "CREATE LOGIN [sp-fallenleaves-github-dev] FROM EXTERNAL PROVIDER; ALTER SERVER ROLE sysadmin ADD MEMBER [sp-fallenleaves-github-dev];"
+```
+
+**c. Bara om Terraform stoppar vid Unity Catalog-objekten** (storage credential, external location och
+catalog) saknar deploy-identiteten behörighet på metastoren. Som Databricks account admin kör du då, i workspacet:
 ```sql
 GRANT CREATE STORAGE CREDENTIAL, CREATE EXTERNAL LOCATION, CREATE CATALOG
 ON METASTORE TO `<client-id för sp-fallenleaves-github-dev>`;
 ```
-Client-id finns i `terraform output deployer_client_ids` i `bootstrap/`. Kör sedan om workflowet. Gör samma sak för prod-identiteten när prod skapas.
+Client-id finns i `terraform output deployer_client_ids` i `bootstrap/`.
 Om workspacet inte tilldelas någon metastore automatiskt sätter du `databricks_metastore_id` i tfvars.
+
+För prod gör du samma steg med `infra/envs/prod` och `sp-fallenleaves-github-prod`.
 
 ### 4. Lägg in Trafikverket-nyckeln
 ```bash

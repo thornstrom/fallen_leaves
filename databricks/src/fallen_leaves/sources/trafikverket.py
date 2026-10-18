@@ -9,6 +9,7 @@ from xml.sax.saxutils import quoteattr
 API_URL = "https://api.trafikinfo.trafikverket.se/v2/data.json"
 ANNOUNCEMENT_SCHEMA_VERSION = "1.9"
 STATION_SCHEMA_VERSION = "1.5"
+STATION_NAMESPACE = "rail.infrastructure"
 DEFAULT_PAGE_SIZE = 5000
 TIMEOUT_S = 120
 
@@ -48,7 +49,7 @@ def announcement_query(api_key: str, day: date, operators: Sequence[str], limit:
 
 def station_query(api_key: str, limit: int, skip: int) -> str:
     query = (
-        f'<QUERY objecttype="TrainStation" schemaversion="{STATION_SCHEMA_VERSION}" '
+        f'<QUERY objecttype="TrainStation" namespace="{STATION_NAMESPACE}" schemaversion="{STATION_SCHEMA_VERSION}" '
         f'orderby="LocationSignature" limit="{limit}" skip="{skip}" />'
     )
     return _request(api_key, query)

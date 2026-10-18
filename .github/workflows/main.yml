@@ -16,6 +16,8 @@ env:
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
   TF_VAR_subscription_id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  # E-posten ligger i en secret så att den maskeras i publika loggar.
+  TF_VAR_catalog_admins: ${{ secrets.CATALOG_ADMIN_EMAIL && format('["{0}"]', secrets.CATALOG_ADMIN_EMAIL) || '[]' }}
   TF_IN_AUTOMATION: "true"
   DATABRICKS_AUTH_TYPE: azure-cli
 
