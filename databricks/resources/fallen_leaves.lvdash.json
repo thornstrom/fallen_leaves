@@ -1,0 +1,937 @@
+{
+  "datasets": [
+    {
+      "name": "ds_national",
+      "displayName": "Per dag och region",
+      "queryLines": [
+        "SELECT event_date, region, n_stations, n_arrivals, avg_arrival_delay_min, share_delayed_5, n_canceled, temp_mean_c, temp_min_c, temp_delta_c, precip_mm, share_arrivals_frost FROM daily_national"
+      ]
+    },
+    {
+      "name": "ds_stations",
+      "displayName": "Per station",
+      "queryLines": [
+        "SELECT location_id, station_name, region, latitude, longitude, SUM(n_arrivals) AS n_arrivals, ROUND(SUM(delay_sum_min) / NULLIF(SUM(n_arrivals), 0), 2) AS avg_arrival_delay_min, ROUND(SUM(n_delayed_5) / NULLIF(SUM(n_arrivals), 0), 3) AS share_delayed_5, SUM(n_canceled) AS n_canceled, ROUND(AVG(temp_mean_c), 1) AS temp_mean_c FROM daily_station_delay_weather WHERE latitude IS NOT NULL GROUP BY location_id, station_name, region, latitude, longitude"
+      ]
+    },
+    {
+      "name": "ds_corr",
+      "displayName": "Korrelationer",
+      "queryLines": [
+        "SELECT region, delay_metric, weather_metric, lag_days, n, ROUND(pearson_r, 3) AS pearson_r, ROUND(spearman_rho, 3) AS spearman_rho, ROUND(p_value_pearson, 4) AS p_value_pearson, CASE WHEN p_value_pearson < 0.05 THEN 'Ja' ELSE 'Nej' END AS signifikant, date_from, date_to FROM correlation_results"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "oversikt",
+      "displayName": "Översikt",
+      "layout": [
+        {
+          "widget": {
+            "name": "f_region_oversikt",
+            "queries": [
+              {
+                "name": "f_region_oversikt_q",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-single-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "region",
+                    "displayName": "Region",
+                    "queryName": "f_region_oversikt_q"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Region"
+              },
+              "selection": {
+                "defaultSelection": {
+                  "values": {
+                    "dataType": "STRING",
+                    "values": [
+                      {
+                        "value": "Sverige"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "t_oversikt",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Välj **en** region åt gången. `Sverige` är hela landet; regionerna är delar av det, så de ska inte summeras ihop."
+              ]
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 0,
+            "width": 4,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "c_arrivals",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "SUM(`n_arrivals`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Ankomster"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Ankomster"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c_delay",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "SUM(`avg_arrival_delay_min` * `n_arrivals`) / SUM(`n_arrivals`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Medelförsening (min)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Medelförsening (min)"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 1,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c_share5",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "SUM(`share_delayed_5` * `n_arrivals`) / SUM(`n_arrivals`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Andel > 5 min sena"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Andel > 5 min sena"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 1,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c_temp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "SUM(`temp_mean_c` * `n_arrivals`) / SUM(CASE WHEN `temp_mean_c` IS NOT NULL THEN `n_arrivals` END)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Medeltemperatur (°C)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Medeltemperatur (°C)"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 1,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "c_canceled",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "value",
+                      "expression": "SUM(`n_canceled`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "value",
+                  "displayName": "Inställda"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Inställda"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "l_delay",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "event_date",
+                      "expression": "`event_date`"
+                    },
+                    {
+                      "name": "y",
+                      "expression": "SUM(`avg_arrival_delay_min` * `n_arrivals`) / SUM(`n_arrivals`)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "event_date",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Datum"
+                },
+                "y": {
+                  "fieldName": "y",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Medelförsening (min)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Medelförsening per dag"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 3,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "l_temp",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "event_date",
+                      "expression": "`event_date`"
+                    },
+                    {
+                      "name": "y",
+                      "expression": "SUM(`temp_mean_c` * `n_arrivals`) / SUM(CASE WHEN `temp_mean_c` IS NOT NULL THEN `n_arrivals` END)"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "event_date",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "displayName": "Datum"
+                },
+                "y": {
+                  "fieldName": "y",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Medeltemperatur (°C)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Medeltemperatur per dag"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 3,
+            "height": 5
+          }
+        }
+      ]
+    },
+    {
+      "name": "samband",
+      "displayName": "Samband",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_samband",
+            "multilineTextboxSpec": {
+              "lines": [
+                "En punkt per dag och region. Sambandet är preliminärt tills det finns flera veckors data."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "s_temp_delay",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "temp_mean_c",
+                      "expression": "`temp_mean_c`"
+                    },
+                    {
+                      "name": "avg_arrival_delay_min",
+                      "expression": "`avg_arrival_delay_min`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "temp_mean_c",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Medeltemperatur (°C)"
+                },
+                "y": {
+                  "fieldName": "avg_arrival_delay_min",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Medelförsening (min)"
+                },
+                "color": {
+                  "fieldName": "region",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Region"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Temperatur mot medelförsening"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 7
+          }
+        }
+      ]
+    },
+    {
+      "name": "temperaturfall",
+      "displayName": "Temperaturfall",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_fall",
+            "multilineTextboxSpec": {
+              "lines": [
+                "`temp_delta_c` är förändringen i medeltemperatur jämfört med dagen innan. Negativt värde = kallare."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "s_delta_share",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_national",
+                  "fields": [
+                    {
+                      "name": "temp_delta_c",
+                      "expression": "`temp_delta_c`"
+                    },
+                    {
+                      "name": "share_delayed_5",
+                      "expression": "`share_delayed_5`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "temp_delta_c",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Temperaturförändring (°C)"
+                },
+                "y": {
+                  "fieldName": "share_delayed_5",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Andel > 5 min sena"
+                },
+                "color": {
+                  "fieldName": "region",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "displayName": "Region"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Temperaturförändring mot andel sena tåg"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 6,
+            "height": 7
+          }
+        }
+      ]
+    },
+    {
+      "name": "stationer",
+      "displayName": "Stationer",
+      "layout": [
+        {
+          "widget": {
+            "name": "f_region_stationer",
+            "queries": [
+              {
+                "name": "f_region_stationer_q",
+                "query": {
+                  "datasetName": "ds_stations",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    }
+                  ],
+                  "disaggregated": false
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "region",
+                    "displayName": "Region",
+                    "queryName": "f_region_stationer_q"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Region"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "m_stations",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_stations",
+                  "fields": [
+                    {
+                      "name": "latitude",
+                      "expression": "`latitude`"
+                    },
+                    {
+                      "name": "longitude",
+                      "expression": "`longitude`"
+                    },
+                    {
+                      "name": "n_arrivals",
+                      "expression": "`n_arrivals`"
+                    },
+                    {
+                      "name": "avg_arrival_delay_min",
+                      "expression": "`avg_arrival_delay_min`"
+                    },
+                    {
+                      "name": "station_name",
+                      "expression": "`station_name`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "symbol-map",
+              "encodings": {
+                "coordinates": {
+                  "latitude": {
+                    "fieldName": "latitude",
+                    "displayName": "latitude"
+                  },
+                  "longitude": {
+                    "fieldName": "longitude",
+                    "displayName": "longitude"
+                  }
+                },
+                "size": {
+                  "fieldName": "n_arrivals",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Ankomster"
+                },
+                "color": {
+                  "fieldName": "avg_arrival_delay_min",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "displayName": "Medelförsening (min)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Stationer: storlek = ankomster, färg = medelförsening"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 1,
+            "width": 4,
+            "height": 9
+          }
+        },
+        {
+          "widget": {
+            "name": "tb_stations",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_stations",
+                  "fields": [
+                    {
+                      "name": "station_name",
+                      "expression": "`station_name`"
+                    },
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "n_arrivals",
+                      "expression": "`n_arrivals`"
+                    },
+                    {
+                      "name": "avg_arrival_delay_min",
+                      "expression": "`avg_arrival_delay_min`"
+                    },
+                    {
+                      "name": "share_delayed_5",
+                      "expression": "`share_delayed_5`"
+                    },
+                    {
+                      "name": "n_canceled",
+                      "expression": "`n_canceled`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "station_name",
+                    "displayName": "Station"
+                  },
+                  {
+                    "fieldName": "region",
+                    "displayName": "Region"
+                  },
+                  {
+                    "fieldName": "n_arrivals",
+                    "displayName": "Ankomster"
+                  },
+                  {
+                    "fieldName": "avg_arrival_delay_min",
+                    "displayName": "Medelförsening (min)"
+                  },
+                  {
+                    "fieldName": "share_delayed_5",
+                    "displayName": "Andel > 5 min"
+                  },
+                  {
+                    "fieldName": "n_canceled",
+                    "displayName": "Inställda"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Stationer"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 1,
+            "width": 2,
+            "height": 9
+          }
+        }
+      ]
+    },
+    {
+      "name": "statistik",
+      "displayName": "Statistik",
+      "layout": [
+        {
+          "widget": {
+            "name": "t_statistik",
+            "multilineTextboxSpec": {
+              "lines": [
+                "Läs korrelationen tillsammans med `n` (antal dagar). Med en höst data är resultaten preliminära, och trender över säsongen (fler resenärer, banarbeten) kan ge samband som inte orsakas av temperaturen. Korrelation är inte orsakssamband."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "tb_corr",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ds_corr",
+                  "fields": [
+                    {
+                      "name": "region",
+                      "expression": "`region`"
+                    },
+                    {
+                      "name": "delay_metric",
+                      "expression": "`delay_metric`"
+                    },
+                    {
+                      "name": "weather_metric",
+                      "expression": "`weather_metric`"
+                    },
+                    {
+                      "name": "lag_days",
+                      "expression": "`lag_days`"
+                    },
+                    {
+                      "name": "n",
+                      "expression": "`n`"
+                    },
+                    {
+                      "name": "pearson_r",
+                      "expression": "`pearson_r`"
+                    },
+                    {
+                      "name": "spearman_rho",
+                      "expression": "`spearman_rho`"
+                    },
+                    {
+                      "name": "p_value_pearson",
+                      "expression": "`p_value_pearson`"
+                    },
+                    {
+                      "name": "signifikant",
+                      "expression": "`signifikant`"
+                    },
+                    {
+                      "name": "date_from",
+                      "expression": "`date_from`"
+                    },
+                    {
+                      "name": "date_to",
+                      "expression": "`date_to`"
+                    }
+                  ],
+                  "disaggregated": true
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "region",
+                    "displayName": "Region"
+                  },
+                  {
+                    "fieldName": "delay_metric",
+                    "displayName": "Förseningsmått"
+                  },
+                  {
+                    "fieldName": "weather_metric",
+                    "displayName": "Vädermått"
+                  },
+                  {
+                    "fieldName": "lag_days",
+                    "displayName": "Fördröjning (dagar)"
+                  },
+                  {
+                    "fieldName": "n",
+                    "displayName": "n"
+                  },
+                  {
+                    "fieldName": "pearson_r",
+                    "displayName": "Pearson r"
+                  },
+                  {
+                    "fieldName": "spearman_rho",
+                    "displayName": "Spearman ρ"
+                  },
+                  {
+                    "fieldName": "p_value_pearson",
+                    "displayName": "p (Pearson)"
+                  },
+                  {
+                    "fieldName": "signifikant",
+                    "displayName": "Signifikant (p < 0,05)"
+                  },
+                  {
+                    "fieldName": "date_from",
+                    "displayName": "Från"
+                  },
+                  {
+                    "fieldName": "date_to",
+                    "displayName": "Till"
+                  }
+                ]
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Korrelationer mellan väder och förseningar"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 2,
+            "width": 6,
+            "height": 10
+          }
+        }
+      ]
+    }
+  ]
+}

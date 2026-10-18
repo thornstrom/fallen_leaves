@@ -1,0 +1,9 @@
+resources:
+  dashboards:
+    fallen_leaves:
+      display_name: Fallande löv
+      file_path: ./fallen_leaves.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      # Frågorna i dashboarden saknar catalog, så samma fil fungerar i dev och prod.
+      dataset_catalog: ${var.catalog}
+      dataset_schema: gold
