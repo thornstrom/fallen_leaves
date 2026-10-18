@@ -17,6 +17,10 @@ variables:
     default: 15.4.x-scala2.12
   node_type:
     default: Standard_D4ds_v5
+  warehouse_id:
+    description: SQL-warehouse som dashboarden kör frågor mot
+    lookup:
+      warehouse: Serverless Starter Warehouse
   secret_scope:
     default: fallen-leaves
 

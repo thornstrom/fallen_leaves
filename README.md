@@ -132,8 +132,13 @@ Merga PR:en. Workflowet `main` kör `terraform plan` för prod och visar planen 
 Efter godkännande i environmentet `prod` körs apply, och sedan deployas jobb och SQL. Upprepa steg 3–4 för prod.
 I prod körs `fallen_leaves_daily` varje natt kl. 04:00 svensk tid.
 
-### 7. Power BI
-Se [`powerbi/README.md`](powerbi/README.md).
+### 7. Visualisering
+**Databricks-dashboard (deployas automatiskt):** bundlen deployar dashboarden *Fallande löv*
+([`databricks/resources/fallen_leaves.lvdash.json`](databricks/resources/fallen_leaves.lvdash.json)) till varje miljö.
+Den läser gold-tabellerna i miljöns catalog via `Serverless Starter Warehouse` och fungerar i webbläsaren, även på Mac.
+Ändra layouten i Databricks och exportera sedan JSON-filen hit, så hamnar ändringen i git.
+
+**Power BI (kräver Windows och ett jobb- eller skolkonto):** se [`powerbi/README.md`](powerbi/README.md).
 
 ## CI/CD
 
