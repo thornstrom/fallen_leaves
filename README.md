@@ -3,8 +3,8 @@
 **Finns det ett samband mellan fallande temperaturer under hösten och förseningar i SJ:s tågtrafik?**
 
 Projektet hämtar varje natt SJ:s tåglägen från Trafikverket och temperaturer från SMHI, kopplar
-ihop dem i en medallion-arkitektur i Databricks och exponerar resultatet via Azure Synapse
-serverless SQL för en Power BI-rapport.
+ihop dem i en medallion-arkitektur i Databricks och visar resultatet i en Databricks-dashboard.
+Gold-lagret finns också som vyer i Azure Synapse serverless SQL, för verktyg som Power BI.
 
 ```
 Trafikverket API ─┐                    ┌─────────────── Databricks (Unity Catalog) ───────────────┐
@@ -14,19 +14,19 @@ SMHI Metobs ───────┘  (volume)  │ (Auto     (payload)       fa
  (temp, nederbörd)              │  Loader)                 dim_location             daily_national   │
                                 │                          map_source_location      correlation_     │
                                 │                          bridge_location_weather  results          │
-                                └──────────────────────────────────────────────────────────┬──────────┘
-                                                                       Delta i gold-containern
-                                                                                           ▼
-                                                     Synapse serverless SQL (vyer) ──► Power BI
+                                └─────────────────┬────────────────────────────────────────┬──────────┘
+                                                  │ gold-tabellerna i Unity Catalog        │ Delta i gold-containern
+                                                  ▼                                        ▼
+                                   Databricks-dashboard (AI/BI)    Synapse serverless SQL (vyer) ──► Power BI (valfritt)
 ```
 
 | Katalog | Innehåll |
 |---|---|
 | `bootstrap/` | Engångs-Terraform: state-lagring, deploy-identiteter (OIDC) och GitHub-environments |
 | `infra/` | Terraform för plattformen. `platform/` är gemensam, `envs/dev` och `envs/prod` skiljer sig bara i `terraform.tfvars` |
-| `databricks/` | Python-paketet `fallen_leaves` och Databricks Asset Bundle med jobben |
+| `databricks/` | Python-paketet `fallen_leaves` och Databricks Asset Bundle med jobben och dashboarden |
 | `synapse/` | SQL för serverless-databasen och vyerna samt `deploy.sh` |
-| `powerbi/` | Guide och DAX-mått för rapporten |
+| `powerbi/` | Alternativ (används inte): guide och DAX-mått för en Power BI-rapport |
 | `.github/` | CI/CD |
 
 ## Datamodell
@@ -89,6 +89,16 @@ innan deployen går igenom. Kör om det misslyckade jobbet efter varje steg (`gh
 finns inte i Databricks förrän du har loggat in en gång. Annars stoppar apply med
 `Could not find principal`. Workspace-adressen får du med `terraform -chdir=infra/envs/dev output -raw databricks_host`.
 
+Om inloggningen i webbläsaren inte räcker (CLI:t svarar fortfarande `Unauthorized access to Org`) loggar du in
+med CLI:t och skickar med workspacets Azure-resurs-id. Då skickas också din Azure management-token, och
+Databricks skapar din användare som admin eftersom du är Owner på workspacet i Azure:
+```bash
+export DATABRICKS_HOST=$(terraform -chdir=infra/envs/dev output -raw databricks_host)
+export DATABRICKS_AUTH_TYPE=azure-cli
+export DATABRICKS_AZURE_RESOURCE_ID=$(az databricks workspace list -g rg-fallenleaves-dev --query '[0].id' -o tsv)
+databricks current-user me
+```
+
 **b. Skapa en SQL-login för deploy-identiteten i Synapse.** Synapse registrerar identiteten som skapar
 workspacet med dess object ID, men en app loggar in med sitt client ID, så CI nekas
 (`Login failed for user '<token-identified principal>'`). Som Synapse-admin kör du, mot `master` på
@@ -133,12 +143,21 @@ Efter godkännande i environmentet `prod` körs apply, och sedan deployas jobb o
 I prod körs `fallen_leaves_daily` varje natt kl. 04:00 svensk tid.
 
 ### 7. Visualisering
-**Databricks-dashboard (deployas automatiskt):** bundlen deployar dashboarden *Fallande löv*
-([`databricks/resources/fallen_leaves.lvdash.json`](databricks/resources/fallen_leaves.lvdash.json)) till varje miljö.
-Den läser gold-tabellerna i miljöns catalog via `Serverless Starter Warehouse` och fungerar i webbläsaren, även på Mac.
-Ändra layouten i Databricks och exportera sedan JSON-filen hit, så hamnar ändringen i git.
+Projektet visualiserar i en **Databricks-dashboard** i stället för Power BI. Bundlen deployar dashboarden
+*Fallande löv* ([`databricks/resources/fallen_leaves.lvdash.json`](databricks/resources/fallen_leaves.lvdash.json))
+till varje miljö, så det finns inget manuellt steg. Den läser gold-tabellerna i miljöns catalog via
+`Serverless Starter Warehouse` och fungerar i webbläsaren, även på Mac. Sidor: Översikt, Samband,
+Temperaturfall, Stationer och Statistik.
 
-**Power BI (kräver Windows och ett jobb- eller skolkonto):** se [`powerbi/README.md`](powerbi/README.md).
+Ändra layouten i Databricks och exportera sedan JSON-filen hit, så hamnar ändringen i git. Frågorna i filen
+ska sakna catalog; bundlen sätter den per miljö (`dataset_catalog`).
+
+Warehouset är ändrat till 2X-Small med auto-stop efter 5 minuter, så det kostar bara när någon tittar.
+Den ändringen ligger utanför bundlen och görs en gång per miljö.
+
+Power BI används inte, eftersom Power BI Desktop bara finns för Windows och Power BI kräver ett jobb- eller
+skolkonto. Synapse-vyerna och guiden i [`powerbi/README.md`](powerbi/README.md) finns kvar om du vill bygga en
+Power BI-rapport ändå.
 
 ## CI/CD
 

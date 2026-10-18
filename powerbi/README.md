@@ -1,5 +1,9 @@
 # Power BI-rapport
 
+> **Används inte.** Projektet visualiserar i Databricks-dashboarden *Fallande löv*
+> (se README steg 7). Den här guiden finns kvar som alternativ om du vill bygga en
+> Power BI-rapport mot Synapse-vyerna, vilket kräver Windows och ett jobb- eller skolkonto.
+
 Rapporten läser vyerna i Synapse serverless (`fallen_leaves`-databasen). Spara den som
 **Power BI-projekt (.pbip)** i den här mappen så versionshanteras modell och rapport i git
 (File → Save as → Power BI Project; aktivera först *Power BI Project (.pbip) save option*
