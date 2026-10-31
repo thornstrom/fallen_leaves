@@ -44,6 +44,8 @@ module "storage" {
   location            = var.location
   replication_type    = var.storage_replication_type
   tags                = local.tags
+
+  gold_reader_object_ids = var.gold_reader_object_ids
 }
 
 module "keyvault" {

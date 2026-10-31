@@ -15,6 +15,12 @@ variable "replication_type" {
   default = "LRS"
 }
 
+variable "gold_reader_object_ids" {
+  description = "Entra ID object ID som får läsa gold-containern direkt, t.ex. Power BI-användare."
+  type        = list(string)
+  default     = []
+}
+
 variable "tags" {
   type    = map(string)
   default = {}

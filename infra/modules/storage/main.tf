@@ -36,3 +36,12 @@ resource "azurerm_storage_container" "this" {
   name               = each.key
   storage_account_id = azurerm_storage_account.lake.id
 }
+
+# Power BI läser gold-tabellerna direkt med användarens Entra ID (OAuth), eftersom
+# nycklar är avstängda. Läsrätten gäller bara gold-containern.
+resource "azurerm_role_assignment" "gold_reader" {
+  for_each             = toset(var.gold_reader_object_ids)
+  scope                = azurerm_storage_container.this["gold"].id
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = each.key
+}
