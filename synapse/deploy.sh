@@ -24,6 +24,27 @@ run() {
     -i "$file"
 }
 
+# Serverless-poolen startar kallt efter en tids inaktivitet och svarar då
+# "The SQL pool is warming up". Vänta tills den svarar; andra fel avbryter direkt.
+wait_for_pool() {
+  local attempt out
+  for attempt in $(seq 1 12); do
+    if out="$(sqlcmd -S "$endpoint" -d master --authentication-method ActiveDirectoryAzCli -b \
+      -Q "SELECT 1" 2>&1)"; then
+      return 0
+    fi
+    if ! grep -q "warming up" <<<"$out"; then
+      echo "$out" >&2
+      return 1
+    fi
+    echo "Synapse-poolen värms upp (försök $attempt/12), väntar 15 s..."
+    sleep 15
+  done
+  echo "Synapse-poolen svarade inte inom 3 minuter." >&2
+  return 1
+}
+
+wait_for_pool
 run master "$here/sql/00_database.sql"
 run fallen_leaves "$here/sql/10_security.sql"
 
