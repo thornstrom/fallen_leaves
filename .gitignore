@@ -7,6 +7,7 @@ crash.log
 .terraform.lock.hcl.bak
 *.auto.tfvars
 bootstrap/terraform.tfvars
+infra/lab/terraform.tfvars
 
 # Python
 __pycache__/

@@ -33,6 +33,12 @@ variable "admin_object_ids" {
   default     = []
 }
 
+variable "gold_reader_object_ids" {
+  description = "Entra ID object ID som får läsa gold-containern direkt (Power BI)."
+  type        = list(string)
+  default     = []
+}
+
 variable "catalog_admins" {
   description = "Databricks-användare/grupper som får ALL PRIVILEGES på catalogen."
   type        = list(string)
