@@ -77,8 +77,10 @@ resource "databricks_volume" "checkpoints" {
   comment      = "Checkpoints och schemaplatser för Auto Loader"
 }
 
+# databricks_grants äger alla grants på catalogen, så både admins och gold-läsare
+# måste ligga i samma resurs.
 resource "databricks_grants" "catalog" {
-  count   = length(var.catalog_admins) == 0 ? 0 : 1
+  count   = length(var.catalog_admins) + length(var.gold_reader_users) == 0 ? 0 : 1
   catalog = databricks_catalog.this.name
 
   dynamic "grant" {
@@ -88,6 +90,38 @@ resource "databricks_grants" "catalog" {
       privileges = ["ALL_PRIVILEGES"]
     }
   }
+
+  dynamic "grant" {
+    for_each = var.gold_reader_users
+    content {
+      principal  = grant.value
+      privileges = ["USE_CATALOG"]
+    }
+  }
+
+  depends_on = [databricks_user.gold_reader]
+}
+
+# Power BI-användare som publicerar gold-tabellerna till Power BI från Catalog Explorer.
+# De läser bara gold och kör frågor via workspacets SQL-warehouse (gruppen users har CAN_USE).
+resource "databricks_user" "gold_reader" {
+  for_each  = toset(var.gold_reader_users)
+  user_name = each.value
+}
+
+resource "databricks_grants" "gold_schema" {
+  count  = length(var.gold_reader_users) == 0 ? 0 : 1
+  schema = "${databricks_catalog.this.name}.${databricks_schema.layer["gold"].name}"
+
+  dynamic "grant" {
+    for_each = var.gold_reader_users
+    content {
+      principal  = grant.value
+      privileges = ["USE_SCHEMA", "SELECT"]
+    }
+  }
+
+  depends_on = [databricks_user.gold_reader]
 }
 
 # Databricks-hanterat scope: Key Vault-backade scopes kan inte skapas av en service principal.

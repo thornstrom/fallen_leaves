@@ -76,6 +76,7 @@ module "databricks_uc" {
   metastore_id         = var.databricks_metastore_id
   workspace_numeric_id = module.databricks_workspace.workspace_numeric_id
   catalog_admins       = var.catalog_admins
+  gold_reader_users    = var.gold_reader_users
 
   # Rolltilldelningen för access connectorn måste finnas innan UC validerar sökvägarna.
   depends_on = [module.databricks_workspace]

@@ -53,5 +53,6 @@ module "platform" {
   admin_object_ids         = var.admin_object_ids
   catalog_admins           = var.catalog_admins
   gold_reader_object_ids   = var.gold_reader_object_ids
+  gold_reader_users        = var.gold_reader_users
   databricks_metastore_id  = var.databricks_metastore_id
 }

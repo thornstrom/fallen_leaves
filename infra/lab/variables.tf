@@ -25,7 +25,7 @@ variable "admin_username" {
 variable "vm_size" {
   description = "Power BI Desktop behöver minst 8 GB minne."
   type        = string
-  default     = "Standard_B2ms"
+  default     = "Standard_B2as_v2"
 }
 
 variable "shutdown_time" {
