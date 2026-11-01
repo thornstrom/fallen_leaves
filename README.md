@@ -4,7 +4,7 @@
 
 Projektet hämtar varje natt SJ:s tåglägen från Trafikverket och temperaturer från SMHI, kopplar
 ihop dem i en medallion-arkitektur i Databricks och visar resultatet i en Databricks-dashboard.
-Gold-lagret läses också av en Power BI-rapport direkt från ADLS Gen2, och finns som vyer i Azure Synapse serverless SQL.
+Gold-lagret publiceras också till en Power BI-rapport från Databricks, och finns som vyer i Azure Synapse serverless SQL.
 
 ```
 Trafikverket API ─┐                    ┌─────────────── Databricks (Unity Catalog) ───────────────┐
@@ -17,7 +17,7 @@ SMHI Metobs ───────┘  (volume)  │ (Auto     (payload)       fa
                                 └─────────────────┬────────────────────────────────────────┬──────────┘
                                                   │ gold-tabellerna i Unity Catalog        │ Delta i gold-containern
                                                   ▼                                        ▼
-                                   Databricks-dashboard (AI/BI)    Power BI (ADLS Gen2, OAuth) · Synapse serverless SQL (vyer)
+                                   Databricks-dashboard (AI/BI) · Power BI (publicerad modell)    Synapse serverless SQL (vyer)
 ```
 
 | Katalog | Innehåll |
@@ -26,8 +26,8 @@ SMHI Metobs ───────┘  (volume)  │ (Auto     (payload)       fa
 | `infra/` | Terraform för plattformen. `platform/` är gemensam, `envs/dev` och `envs/prod` skiljer sig bara i `terraform.tfvars` |
 | `databricks/` | Python-paketet `fallen_leaves` och Databricks Asset Bundle med jobben och dashboarden |
 | `synapse/` | SQL för serverless-databasen och vyerna samt `deploy.sh` |
-| `powerbi/` | Power BI-rapport som läser gold direkt från ADLS Gen2: Power Query-frågor, DAX-mått och guide |
-| `infra/lab/` | Fristående Windows-VM med Power BI Desktop (lokal state), för den som inte har Windows |
+| `powerbi/` | Guide för Power BI-rapporten (publicerad från Databricks), DAX-mått och Power Query-frågor för ADLS-alternativet |
+| `infra/lab/` | Fristående Windows-VM med Power BI Desktop (lokal state), bara för ADLS-alternativet |
 | `.github/` | CI/CD |
 
 ## Datamodell
@@ -62,7 +62,7 @@ Förseningsmåtten räknas på **ankomster** som inte är inställda. Tidiga ank
 - **Databricks account admin** i ditt Databricks-konto, för Unity Catalog-behörigheter.
 - Ett GitHub-repo, med `gh` inloggat.
 - En API-nyckel från Trafikverket. Registrera dig gratis på https://api.trafikinfo.trafikverket.se/.
-- Power BI Pro eller Fabric-trial med ett jobb- eller skolkonto, för Power BI-rapporten.
+- För Power BI-rapporten: ett jobb- eller skolkonto i tenanten med Power BI Premium Per User (utvärderingen räcker).
 - Lokalt: `terraform` ≥ 1.6, `az`, `databricks` CLI ≥ 0.230, `go-sqlcmd`, Python 3.10+ och Java 17 (för testerna).
 
 ### 1. Bootstrap
@@ -156,10 +156,10 @@ ska sakna catalog; bundlen sätter den per miljö (`dataset_catalog`).
 Warehouset är ändrat till 2X-Small med auto-stop efter 5 minuter, så det kostar bara när någon tittar.
 Den ändringen ligger utanför bundlen och görs en gång per miljö.
 
-Det finns också en **Power BI-rapport** som läser gold-tabellerna direkt från ADLS Gen2 med Entra ID (OAuth)
-och uppdateras i Power BI Service varje morgon. Power BI-användaren får *Storage Blob Data Reader* på bara
-`gold`-containern via `gold_reader_object_ids`. Power BI Desktop kräver Windows, så `infra/lab/` skapar en
-VM för det. Se [`powerbi/README.md`](powerbi/README.md).
+Det finns också en **Power BI-rapport** med samma sidor. Gold-tabellerna publiceras från Databricks
+Catalog Explorer till en semantisk modell i ett Power BI-workspace (Premium Per User), och rapporten byggs
+i webbläsaren. Modellen uppdateras kl. 06:00. Power BI-användaren läggs till i Databricks med läsrätt på
+`gold` via `gold_reader_users`. Se [`powerbi/README.md`](powerbi/README.md).
 
 ## CI/CD
 

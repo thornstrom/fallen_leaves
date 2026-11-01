@@ -32,3 +32,6 @@ powerbi/**/.pbi/cache.abf
 .DS_Store
 .idea/
 .vscode/
+
+# Playwright (webbläsarautomation)
+.playwright-mcp/

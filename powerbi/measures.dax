@@ -1,40 +1,53 @@
-// Mått för rapporten "Fallande löv". Lägg dem i tabellen daily_national
-// (Modellering → Nytt mått) eller i en separat måtttabell.
+// Mått för rapporten "Fallande löv".
+// Klistra in hela filen i semantiska modellens DAX-frågevy (läge Redigering), kör den för att
+// kontrollera värdena och klicka sedan "Uppdatera modellen med ändringar".
+//
+// region innehåller både landsdelarna och "Sverige" (hela landet). Filtrera på region,
+// annars räknas varje tåg två gånger.
+DEFINE
+    MEASURE daily_national[Ankomster] =
+        SUM ( daily_national[n_arrivals] )
 
-Ankomster =
-SUM ( daily_national[n_arrivals] )
+    MEASURE daily_national[Medelförsening (min)] =
+        DIVIDE (
+            SUMX ( daily_national, daily_national[avg_arrival_delay_min] * daily_national[n_arrivals] ),
+            [Ankomster]
+        )
 
-Medelförsening (min) =
-DIVIDE (
-    SUMX ( daily_national, daily_national[avg_arrival_delay_min] * daily_national[n_arrivals] ),
-    [Ankomster]
-)
+    MEASURE daily_national[Andel > 5 min sena] =
+        DIVIDE (
+            SUMX ( daily_national, daily_national[share_delayed_5] * daily_national[n_arrivals] ),
+            [Ankomster]
+        )
 
-Andel > 5 min sena =
-DIVIDE (
-    SUMX ( daily_national, daily_national[share_delayed_5] * daily_national[n_arrivals] ),
-    [Ankomster]
-)
+    MEASURE daily_national[Medeltemperatur (°C)] =
+        DIVIDE (
+            SUMX (
+                FILTER ( daily_national, NOT ISBLANK ( daily_national[temp_mean_c] ) ),
+                daily_national[temp_mean_c] * daily_national[n_arrivals]
+            ),
+            SUMX (
+                FILTER ( daily_national, NOT ISBLANK ( daily_national[temp_mean_c] ) ),
+                daily_national[n_arrivals]
+            )
+        )
 
-Medeltemperatur (°C) =
-DIVIDE (
-    SUMX (
-        FILTER ( daily_national, NOT ISBLANK ( daily_national[temp_mean_c] ) ),
-        daily_national[temp_mean_c] * daily_national[n_arrivals]
-    ),
-    SUMX (
-        FILTER ( daily_national, NOT ISBLANK ( daily_national[temp_mean_c] ) ),
-        daily_national[n_arrivals]
+    MEASURE daily_national[Inställda] =
+        SUM ( daily_national[n_canceled] )
+
+    // För korrelationstabellen. Kräver att tabellens numeriska kolumner står på "Summera inte",
+    // så att varje rad är en enda kombination av region, mått, väder och fördröjning.
+    MEASURE correlation_results[Signifikant (p < 0,05)] =
+        IF ( SELECTEDVALUE ( correlation_results[p_value_pearson] ) < 0.05, "Ja", "Nej" )
+
+EVALUATE
+    CALCULATETABLE (
+        ROW (
+            "Ankomster", [Ankomster],
+            "Medelförsening (min)", [Medelförsening (min)],
+            "Andel > 5 min sena", [Andel > 5 min sena],
+            "Medeltemperatur (°C)", [Medeltemperatur (°C)],
+            "Inställda", [Inställda]
+        ),
+        daily_national[region] = "Sverige"
     )
-)
-
-Inställda =
-SUM ( daily_national[n_canceled] )
-
-// För korrelationstabellen: visar bara resultat med tillräckligt underlag.
-Signifikant (p < 0,05) =
-IF (
-    SELECTEDVALUE ( correlation_results[p_value_pearson] ) < 0.05,
-    "Ja",
-    "Nej"
-)
