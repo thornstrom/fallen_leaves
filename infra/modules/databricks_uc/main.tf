@@ -104,9 +104,13 @@ resource "databricks_grants" "catalog" {
 
 # Power BI-användare som publicerar gold-tabellerna till Power BI från Catalog Explorer.
 # De läser bara gold och kör frågor via workspacets SQL-warehouse (gruppen users har CAN_USE).
+# Gruppen users saknar entitlements i workspacet, så användaren behöver workspace-access
+# för att alls kunna öppna workspacet och databricks-sql-access för warehouse och Catalog Explorer.
 resource "databricks_user" "gold_reader" {
-  for_each  = toset(var.gold_reader_users)
-  user_name = each.value
+  for_each              = toset(var.gold_reader_users)
+  user_name             = each.value
+  workspace_access      = true
+  databricks_sql_access = true
 }
 
 resource "databricks_grants" "gold_schema" {
