@@ -32,3 +32,9 @@ variable "catalog_admins" {
   type        = list(string)
   default     = []
 }
+
+variable "gold_reader_users" {
+  description = "Användare (e-post) som läggs till i workspacet och får läsa schemat gold (Power BI)."
+  type        = list(string)
+  default     = []
+}

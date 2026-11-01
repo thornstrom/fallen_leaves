@@ -39,6 +39,12 @@ variable "gold_reader_object_ids" {
   default     = []
 }
 
+variable "gold_reader_users" {
+  description = "Databricks-användare (e-post) som får läsa schemat gold och publicera till Power BI."
+  type        = list(string)
+  default     = []
+}
+
 variable "catalog_admins" {
   description = "Databricks-användare/grupper som får ALL PRIVILEGES på catalogen."
   type        = list(string)

@@ -26,6 +26,11 @@ variable "gold_reader_object_ids" {
   default = []
 }
 
+variable "gold_reader_users" {
+  type    = list(string)
+  default = []
+}
+
 variable "catalog_admins" {
   type    = list(string)
   default = []
